@@ -1,0 +1,28 @@
+{
+  "_说明": "复制本文件为 notion_sync.local.json 并填写。该文件已 gitignore，绝不提交。Notion 令牌不写在这里——只写环境变量名。",
+
+  "token_env": "NOTION_API_TOKEN",
+  "entry_token_env": "PKA_SYNC_TOKEN",
+
+  "_targets说明": "Notion 目标别名白名单。parent_page_id = 你授权给 Integration 的父页面 ID（页面链接里 32 位十六进制串）。Agent 只能选别名，不能提交其他页面 ID。",
+  "targets": {
+    "阅读收件箱": {
+      "parent_page_id": "在这里填父页面ID",
+      "note": "新收集材料统一进这个页面下"
+    },
+    "待审核候选": {
+      "parent_page_id": "在这里填候选笔记专用父页面ID",
+      "note": "candidate_note 类型建议指向这里，与正式笔记分开"
+    }
+  },
+
+  "_local_roots说明": "本地目录白名单（解析后校验）。只开放明确允许的目录；默认不开放 Obsidian 库本体。填 absolute 路径。",
+  "local_roots": [
+    "D:\\hu\\Obsidian\\output"
+  ],
+
+  "_page_links说明": "可选：[[双链]] 名称 → Notion 页面链接 的显式映射。未命中的双链保留原文并返回警告。",
+  "page_links": {},
+
+  "base_url": "https://api.notion.com/v1"
+}

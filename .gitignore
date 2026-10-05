@@ -1,0 +1,48 @@
+# 秘密与本地配置
+ai.local.json
+.env
+.env.*
+*.local.json
+notion_sync.local.json
+
+# MD → Notion 同步：本机任务/版本账本（只用于失败恢复与去重，含路径不含令牌与正文）
+pka_graph/notion_sync_data/
+notion_sync_ledger.json
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# 运行日志与评估产物
+server.log
+test_results/
+
+# 运行时状态（个人学习状态管理区：权威状态/备份/流水/预算，删除后自动重建）
+**/个人学习状态/
+inbox_registry.json
+note_budget.json
+
+# 本机调试快照与个人工作记录
+pre_injection_snapshot*.json
+运行反馈/
+
+# Obsidian 工作区缓存（真实库不入库；测试库若含也跳过）
+.obsidian/
+
+# 收件箱端到端测试运行产物（待分类领域下的自动入库件）
+test_vault/正式笔记/待分类领域/
+test_vault/候选笔记/待分类领域/
+
+# E2E 自动入库产物落点（领域目录在前）
+test_vault/待分类领域/
+
+# Notion 同步：本地配置与账本（不提交）
+notion_sync.local.json
+notion_sync_data/
+
+# 打包产物
+build/
+dist/
+*.spec
+instance.local.json

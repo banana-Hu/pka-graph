@@ -1,0 +1,1430 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>知能图谱 · 两层图谱与节点管理（测试知识库）</title>
+<style>
+:root{--mastery:#0F766E;--mastery-soft:#CCECE8;--vision:#B45309;--vision-soft:#FDEBD3;
+--ink:#1F2937;--muted:#6B7280;--line:#E5E7EB;--bg:#F6F7F9;--danger:#B91C1C;--card:#FFFFFF}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:var(--card);border-bottom:2px solid var(--vision);padding:10px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+header h1{font-size:17px;margin:0}
+.banner{background:var(--vision-soft);color:var(--vision);border:1px solid var(--vision);
+padding:3px 10px;border-radius:4px;font-weight:600;font-size:13px}
+.banner::before{content:"⚠ "}
+.spacer{flex:1}
+.meta{color:var(--muted);font-size:12px}
+button{font-family:inherit;font-size:13px;padding:6px 12px;border-radius:6px;border:1px solid var(--line);background:#fff;cursor:pointer}
+button.primary{background:var(--mastery);border-color:var(--mastery);color:#fff}
+button.warn{background:#fff;border-color:var(--vision);color:var(--vision)}
+button.danger{background:#fff;border-color:var(--danger);color:var(--danger)}
+button:disabled{opacity:.5;cursor:not-allowed}
+nav{display:flex;gap:4px;padding:10px 20px 0;background:var(--card);border-bottom:1px solid var(--line)}
+nav button{border:none;border-bottom:2px solid transparent;border-radius:6px 6px 0 0}
+nav button.active{border-bottom-color:var(--mastery);color:var(--mastery);font-weight:600}
+main{padding:14px 20px;max-width:1500px;margin:0 auto}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:14px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}
+input,select,textarea{font-family:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:6px}
+textarea{width:100%;min-height:60px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:600;background:#FAFBFC}
+.tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;font-weight:600}
+.tag.passed{background:var(--mastery-soft);color:var(--mastery)}
+.tag.untested,.tag.failed{background:var(--vision-soft);color:var(--vision)}
+.tag.formal{background:var(--mastery-soft);color:var(--mastery)}
+.tag.candidate{background:var(--vision-soft);color:var(--vision)}
+.tag.archived{background:#E5E7EB;color:var(--muted)}
+.muted{color:var(--muted)}
+.warn-text{color:var(--vision)}
+.err-text{color:var(--danger)}
+pre{background:#0B1220;color:#D1E3FF;padding:10px;border-radius:6px;font-size:12px;overflow:auto;max-height:320px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+.hidden{display:none}
+#toast{position:fixed;right:16px;bottom:16px;max-width:420px;background:var(--ink);color:#fff;
+padding:10px 14px;border-radius:8px;font-size:13px;display:none;white-space:pre-wrap;z-index:99}
+label.small{font-size:12px;color:var(--muted)}
+fieldset{border:1px solid var(--line);border-radius:6px;margin:8px 0}
+.confirmtip{background:var(--vision-soft);border:1px dashed var(--vision);padding:8px;border-radius:6px;font-size:13px;margin:8px 0}
+/* ---- 图谱 ---- */
+#statsBar{display:flex;gap:18px;align-items:center;flex-wrap:wrap;font-size:13px}
+#statsBar b{font-size:15px}
+.stat-master{color:var(--mastery)} .stat-vision{color:var(--vision)}
+#graphWrap{position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:
+ linear-gradient(#fff,#fff)}
+#graphSvg{display:block;width:100%;height:640px;cursor:grab;touch-action:none}
+#graphSvg.panning{cursor:grabbing}
+.band-label{font-size:12px;font-weight:700;letter-spacing:2px;fill:var(--muted)}
+.node-rect.mastery{fill:var(--mastery-soft);stroke:var(--mastery)}
+.node-rect.vision{fill:var(--vision-soft);stroke:var(--vision)}
+.node-rect{stroke-width:1.5}
+.node-stripe.mastery{fill:var(--mastery)}
+.node-stripe.vision{fill:var(--vision)}
+.node-text{font-size:12px;fill:var(--ink);font-family:inherit}
+.node-sub{font-size:10px;fill:var(--muted)}
+.node-g{cursor:pointer}
+.node-g.selected .node-rect{stroke-width:3}
+.node-g.dim{opacity:.14}
+.edge{stroke:#9CA3AF;stroke-width:1.2;fill:none}
+.edge.related{stroke-dasharray:5 4}
+.edge.prerequisite{stroke:#374151}
+.edge.extends{stroke:#6D28D9}
+.edge.dim{opacity:.1}
+.edge-label{font-size:9px;fill:var(--muted)}
+#legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);padding:6px 2px}
+.lg{display:inline-flex;align-items:center;gap:5px}
+.lg .sw{width:14px;height:14px;border-radius:3px;display:inline-block;border:1px solid var(--line)}
+#graphOverlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(246,247,249,.94);z-index:5;text-align:center;padding:30px}
+#graphOverlay.hidden{display:none}
+#detailSide{position:absolute;top:0;right:0;bottom:0;width:400px;background:var(--card);border-left:1px solid var(--line);
+padding:14px;overflow:auto;z-index:4;box-shadow:-4px 0 12px rgba(0,0,0,.06)}
+#detailSide h3{margin:0 0 4px}
+#noteModal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:50}
+#noteModal.hidden{display:none}
+#acceptModal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:55}
+#acceptModal.hidden{display:none}
+#acceptModal .box{background:#fff;border-radius:10px;max-width:760px;width:94%;max-height:88vh;display:flex;flex-direction:column}
+#acceptModal .head{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center}
+#acceptModal .body{padding:16px 20px;overflow:auto;font-size:14px;line-height:1.7}
+#noteModal .box{background:#fff;border-radius:10px;max-width:820px;width:92%;max-height:84vh;display:flex;flex-direction:column}
+#noteModal .head{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center}
+#noteModal .body{padding:16px 20px;overflow:auto;font-size:14px;line-height:1.7}
+#quizModal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:60}
+#quizModal.hidden{display:none}
+#quizModal .box{background:#fff;border-radius:10px;max-width:760px;width:94%;max-height:88vh;display:flex;flex-direction:column}
+#quizModal .head{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center}
+#quizModal .body{padding:16px 20px;overflow:auto;font-size:14px;line-height:1.7}
+.quiz-state{font-weight:700}
+.quiz-ok{color:var(--mastery)} .quiz-bad{color:var(--vision)} .quiz-err{color:var(--danger)}
+.quiz-q{background:#F8FAFC;border:1px solid var(--line);border-radius:8px;padding:12px;white-space:pre-wrap}
+.quiz-notice{background:var(--vision-soft);border:1px dashed var(--vision);border-radius:6px;padding:8px;font-size:12px;margin:8px 0}
+#noteBody h1{font-size:19px}#noteBody h2{font-size:17px}#noteBody h3{font-size:15px}
+#noteBody code{background:#F3F4F6;padding:1px 5px;border-radius:4px;font-size:13px}
+#noteBody blockquote{border-left:3px solid var(--line);margin:6px 0;padding:2px 12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <h1>知能图谱</h1>
+  <span class="banner" id="banner">测试知识库，未连接正式写入</span>
+  <span class="meta" id="vaultMeta"></span>
+  <span class="spacer"></span>
+  <span class="meta" id="verMeta">state v-</span>
+  <span class="meta quiz-bad" id="reviewBadge2"></span>
+  <span class="meta quiz-bad" id="reviewBadge2"></span>
+  <button class="danger" id="stopBtn">停止服务</button>
+</header>
+<nav>
+  <button data-tab="graph" class="active" onclick="showTab('graph')">图谱</button>
+  <button data-tab="review" onclick="showTab('review')">待复习 <span id="reviewBadge" class="muted"></span></button>
+  <button data-tab="discovery" onclick="showTab('discovery')">发现</button>
+  <button data-tab="review" onclick="showTab('review')">待复习 <span id="reviewBadge" class="muted"></span></button>
+  <button data-tab="scan" onclick="showTab('scan')">扫描与导入</button>
+  <button data-tab="nodes" onclick="showTab('nodes')">节点管理</button>
+  <button data-tab="ops" onclick="showTab('ops')">合并 / 拆分</button>
+  <button data-tab="archive" onclick="showTab('archive')">归档与恢复</button>
+</nav>
+<main>
+  <!-- ================= 图谱 ================= -->
+  <section id="tab-discovery" class="hidden">
+    <div class="confirmtip warn-text">这里是待审核建议，不代表用户已经了解或掌握。接受建议只创建候选笔记与视野层节点（untested），不自动发布、不自动判通过。</div>
+    <div class="panel">
+      <div class="row">
+        <button class="primary" onclick="runDiscoveryCheck()">检查知识增量</button>
+        <span class="muted" id="discStatus">距上次检查：—</span>
+      </div>
+      <div class="row">
+        <label class="small">周期检查（应用运行期间）：
+          <select id="discAuto" onchange="setDiscoveryAuto(this.value)">
+            <option value="0">关闭（默认）</option><option value="15">每 15 分钟</option>
+            <option value="30">每 30 分钟</option><option value="60">每 60 分钟</option>
+          </select>
+        </label>
+        <label class="small">每批上限：<span id="discLimit">10</span> 条</label>
+        <span class="muted" id="discSources"></span>
+      </div>
+      <div class="quiz-notice">远程正文抓取：<b>默认关闭</b>（未启用）。当前仅分析上游已有摘要与用户补充材料；不自动下载/运行任何项目代码。模型增量判断：<b>未配置、未验证</b>（确定性规则提取）。</div>
+      <div id="discBanner"></div>
+      <div class="quiz-notice" id="inboxStatus" style="margin-top:8px">收件箱：加载中…</div>
+    </div>
+    <div class="panel">
+      <div class="row">
+        <span class="muted">显示：待审核（pending）建议；忽略/稍后可在状态里区分。</span>
+        <span class="spacer"></span>
+        <span class="muted">每天可以没有新增知识。</span>
+      </div>
+      <div id="suggestionList"></div>
+    </div>
+  </section>
+  <section id="tab-review" class="hidden">
+    <div class="panel">
+      <h3 style="margin-top:0">复习设置</h3>
+      <div id="reviewSettings"></div>
+      <p class="muted">间隔含义：本次完成到下一次复习的天数（试用默认，可修改；不是"艾宾浩斯科学时间表"）。修改默认只影响后续排期。</p>
+    </div>
+    <div class="panel">
+      <div class="row">
+        <button onclick="refreshReview()">刷新</button>
+        <label class="small"><input type="checkbox" id="reviewPollChk" checked onchange="toggleReviewPoll()"> 界面打开期间每 60 秒检查到期</label>
+        <span class="muted">应用关闭或服务未运行时不会主动通知；再次打开后可看到积压事项。已读提醒不等于完成复习。</span>
+      </div>
+      <div id="reviewGroups"></div>
+    </div>
+  </section>
+  <section id="tab-review" class="hidden">
+    <div class="panel">
+      <h3 style="margin-top:0">复习设置</h3>
+      <div id="reviewSettings"></div>
+      <p class="muted">间隔含义：本次完成到下一次复习的天数（试用默认，可修改；不是"艾宾浩斯科学时间表"）。修改默认只影响后续排期；如需重算已有安排，先预览差异再确认。</p>
+    </div>
+    <div class="panel">
+      <div class="row">
+        <button onclick="refreshReview()">刷新</button>
+        <label class="small"><input type="checkbox" id="reviewPollChk" checked> 界面打开期间每 60 秒检查到期</label>
+        <span class="muted">应用关闭或服务未运行时不会主动通知；再次打开后可看到积压事项。已读提醒不等于完成复习。</span>
+      </div>
+      <div id="reviewGroups"></div>
+    </div>
+  </section>
+  <section id="tab-graph">
+    <div class="panel">
+      <div id="statsBar">
+        <span>活跃节点 <b id="stTotal">-</b></span>
+        <span class="stat-master">掌握层 <b id="stMastery">-</b></span>
+        <span class="stat-vision">视野层 <b id="stVision">-</b></span>
+        <span>当前筛选命中 <b id="stFiltered">-</b></span>
+        <span class="muted">（左三项为全库活跃数量，最后一项为筛选结果）</span>
+        <span class="spacer"></span>
+        <span class="muted" id="hiddenNote"></span>
+      </div>
+      <div class="row">
+        <input id="gq" placeholder="搜索：名称 / 别名 / 范围（支持中文与特殊字符）" style="flex:1;min-width:220px">
+        <select id="gDomain"><option value="">全部领域</option></select>
+        <select id="gLayer"><option value="">两层全部</option><option value="mastery">掌握层</option><option value="vision">视野层</option></select>
+        <select id="gStatus"><option value="">全部状态</option><option>untested</option><option>failed</option><option>passed</option></select>
+        <button onclick="clearFilters()">清除筛选</button>
+        <button onclick="refreshGraph(true)">刷新</button>
+      </div>
+      <div class="row">
+        <button onclick="fitView()">适应视图</button>
+        <button onclick="resetView()">重置视角</button>
+        <button id="edgeToggle" onclick="toggleEdges()">隐藏关系</button>
+        <label class="small"><input type="checkbox" id="focusChk" onchange="applyFocus()"> 聚焦邻域（选中节点的一阶关系）</label>
+        <span class="muted">拖动画布 · 滚轮缩放 · 点击节点看详情</span>
+      </div>
+      <div id="legend">
+        <span class="lg"><span class="sw" style="background:var(--mastery-soft);border-color:var(--mastery)"></span>掌握层（passed）</span>
+        <span class="lg"><span class="sw" style="background:var(--vision-soft);border-color:var(--vision)"></span>视野层（untested / failed，节点内标注具体状态）</span>
+        <span class="lg">—&gt; prerequisite（箭头指向后继）</span>
+        <span class="lg">—&gt; extends（箭头指向被延伸的基础）</span>
+        <span class="lg">- - related（相关，对称无方向）</span>
+      </div>
+      <div id="graphWrap">
+        <svg id="graphSvg" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#374151"/></marker>
+            <marker id="arrP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6D28D9"/></marker>
+          </defs>
+          <g id="viewport">
+            <text x="40" y="46" class="band-label">掌握层 · 已通过测验</text>
+            <text x="40" y="486" class="band-label">视野层 · 未测验 / 未通过</text>
+            <line x1="20" y1="460" x2="1580" y2="460" stroke="#E5E7EB" stroke-dasharray="2 6"/>
+            <g id="edgeLayer"></g>
+            <g id="nodeLayer"></g>
+          </g>
+        </svg>
+        <div id="graphOverlay" class="hidden"></div>
+        <div id="detailSide" class="hidden"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 扫描与导入 ================= -->
+  <section id="tab-scan" class="hidden">
+    <div class="panel">
+      <div class="row">
+        <button class="primary" onclick="doScan('real')">扫描真实知识库（只读）</button>
+        <button onclick="doScan('test')">扫描测试知识库</button>
+        <span class="muted">目标范围：候选笔记/ 与 正式笔记/ 下的 .md；技能、证据、运行记录等一律跳过</span>
+      </div>
+      <div id="scanStats" class="muted"></div>
+      <div id="scanNear" class="muted"></div>
+      <table id="scanTable"><thead>
+        <tr><th></th><th>ID</th><th>标题</th><th>领域</th><th>审核状态</th><th>身份方式</th><th>警告</th></tr>
+      </thead><tbody></tbody></table>
+    </div>
+    <div class="panel hidden" id="importPanel">
+      <h3 style="margin:4px 0">接入预览</h3>
+      <div class="row">
+        <label class="small">勾选笔记接入到节点：<select id="assignNode"></select></label>
+        <button onclick="buildPreview()">生成预览（不写入）</button>
+        <button class="primary" id="applyBtn" onclick="applyImport()" disabled>确认写入测试库管理区</button>
+        <span class="muted">关联到节点：<b id="assignTarget"></b></span>
+      </div>
+      <pre id="previewBox">（尚未生成预览）</pre>
+    </div>
+  </section>
+
+  <!-- ================= 节点管理 ================= -->
+  <section id="tab-nodes" class="hidden">
+    <div class="panel">
+      <div class="row">
+        <input id="fName" placeholder="按名称筛选" oninput="refreshNodes()">
+        <select id="fDomain" onchange="refreshNodes()"><option value="">全部领域</option></select>
+        <select id="fStatus" onchange="refreshNodes()">
+          <option value="">全部状态</option><option>untested</option><option>failed</option><option>passed</option>
+        </select>
+        <span class="spacer"></span>
+        <button onclick="toggleCreate()">+ 新建节点</button>
+      </div>
+      <div id="createBox" class="hidden">
+        <fieldset><legend>新建节点（一律 untested，进入视野层）</legend>
+          <div class="row"><input id="cName" placeholder="名称" style="width:240px">
+          <input id="cDomain" placeholder="领域（如 AI技术领域）" style="width:220px"></div>
+          <textarea id="cScope" placeholder="知识/能力范围：边界明确的描述"></textarea>
+          <div class="row"><input id="cAliases" placeholder="别名（逗号分隔，可空）" style="flex:1">
+          <button class="primary" onclick="createNode()">创建</button></div>
+        </fieldset>
+      </div>
+      <table id="nodeTable"><thead>
+        <tr><th>状态</th><th>名称</th><th>领域</th><th>范围</th><th>关联笔记</th><th>ID</th></tr>
+      </thead><tbody></tbody></table>
+    </div>
+    <div class="panel hidden" id="detailPanel">
+      <div class="grid2">
+        <div>
+          <h3 id="dTitle" style="margin-top:0"></h3>
+          <p id="dMeta" class="muted"></p>
+          <div class="row"><label class="small">名称</label></div>
+          <input id="eName" style="width:100%">
+          <div class="row"><label class="small">别名（逗号分隔）</label></div>
+          <input id="eAliases" style="width:100%">
+          <div class="row"><label class="small">领域</label></div>
+          <input id="eDomain" style="width:100%">
+          <div class="row"><label class="small">知识/能力范围</label></div>
+          <textarea id="eScope"></textarea>
+          <div class="confirmtip hidden" id="scopeTip">
+            修改范围 = 实质改变知识边界。确认后节点将回到 <b>untested</b>（视野层）。
+            <div class="row"><button class="warn" onclick="saveNode(true)">确认修改并回到 untested</button>
+            <button onclick="hide('scopeTip')">取消</button></div>
+          </div>
+          <div class="row">
+            <button class="primary" onclick="saveNode(false)">保存修改</button>
+            <button id="nodeQuizBtn" class="primary hidden" onclick="startQuiz(currentNode.node.id)">开始掌握测验</button>
+            <button class="danger" onclick="archiveCurrent()">归档此节点（可恢复）</button>
+          </div>
+        </div>
+        <div>
+          <h4>关联笔记 <span class="muted" id="dLinks"></span></h4>
+          <table id="linkTable"><tbody></tbody></table>
+          <h4>节点关系</h4>
+          <table id="relTable"><tbody></tbody></table>
+          <fieldset><legend>添加关系（有向）</legend>
+            <div class="row">
+              <select id="relDir"><option value="out">本节点 → 对方</option><option value="in">对方 → 本节点</option></select>
+              <select id="relType"><option>related</option><option>prerequisite</option><option>extends</option></select>
+              <select id="relTarget"></select>
+              <button onclick="addRelation()">添加</button>
+            </div>
+            <p class="muted" style="margin:4px 0">related=相关（对称）· prerequisite=对方是本节点的前置（选"对方→本节点"）· extends=本节点延伸自对方（选"本节点→对方"）</p>
+          </fieldset>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 合并 / 拆分 ================= -->
+  <section id="tab-ops" class="hidden">
+    <div class="grid2">
+      <div class="panel">
+        <h3 style="margin-top:0">合并节点</h3>
+        <div class="row"><label class="small">源（并入后归档）</label><select id="mSrc"></select></div>
+        <div class="row"><label class="small">目标（保留）</label><select id="mDst"></select></div>
+        <div class="row"><button onclick="mergePreview()">预览受影响的关联</button></div>
+        <pre id="mergePreviewBox">（先预览）</pre>
+        <div class="row"><button class="primary" id="mergeApplyBtn" disabled onclick="mergeApply()">确认合并</button>
+        <span class="muted">源节点归档（可恢复），状态不迁移；关联按预览迁移</span></div>
+      </div>
+      <div class="panel">
+        <h3 style="margin-top:0">拆分节点</h3>
+        <div class="row"><label class="small">源节点</label><select id="sSrc" onchange="splitPreview()"></select></div>
+        <fieldset><legend>新节点 A</legend>
+          <input id="sAName" placeholder="名称" style="width:100%"><textarea id="sAScope" placeholder="范围"></textarea>
+        </fieldset>
+        <fieldset><legend>新节点 B</legend>
+          <input id="sBName" placeholder="名称" style="width:100%"><textarea id="sBScope" placeholder="范围"></textarea>
+        </fieldset>
+        <div class="row"><button onclick="splitPreview()">预览关联去向</button></div>
+        <pre id="splitPreviewBox">（先预览）</pre>
+        <div id="splitAssign"></div>
+        <div class="row"><button class="primary" id="splitApplyBtn" disabled onclick="splitApply()">确认拆分</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 归档与恢复 ================= -->
+  <section id="tab-archive" class="hidden">
+    <div class="panel">
+      <h3 style="margin-top:0">归档节点（可恢复，默认不出现在图谱与统计中）</h3>
+      <table id="archiveTable"><thead>
+        <tr><th>名称</th><th>归档原因</th><th>归档时间</th><th>恢复说明</th><th></th></tr>
+      </thead><tbody></tbody></table>
+      <p class="muted">恢复后的节点一律回到 untested（视野层）——结构变更过，不自动回到掌握层。</p>
+    </div>
+  </section>
+</main>
+<div id="quizModal" class="hidden">
+  <div class="box">
+    <div class="head"><b id="quizTitle">掌握测验</b><span class="muted" id="quizAdapter"></span>
+      <span class="spacer"></span><button onclick="cancelQuiz(false)">取消测验</button></div>
+    <div class="body" id="quizBody"></div>
+  </div>
+</div>
+<div id="acceptModal" class="hidden">
+  <div class="box">
+    <div class="head"><b id="acceptTitle">接受建议</b><span class="muted" id="acceptKind"></span>
+      <span class="spacer"></span><button onclick="hide('acceptModal')">取消</button></div>
+    <div class="body" id="acceptBody"></div>
+  </div>
+</div>
+<div id="noteModal" class="hidden">
+  <div class="box">
+    <div class="head"><b id="noteTitle">原文</b><span class="muted" id="notePath"></span>
+      <span class="spacer"></span><button onclick="hide('noteModal')">关闭</button></div>
+    <div class="body" id="noteBody"></div>
+  </div>
+</div>
+<div id="toast"></div>
+<script>
+let VERSION = 0;
+let currentNode = null, currentScan = null, previewPayload = null, mergePlan = null, splitPlan = null;
+let graph = null, positions = {}, selectedId = null, edgesHidden = false;
+let view = {tx: 0, ty: 0, k: 1};
+
+const $ = id => document.getElementById(id);
+const toast = (msg, isErr=false) => { const t=$('toast'); t.textContent=msg;
+  t.style.background = isErr ? '#B91C1C' : 'var(--ink)'; t.style.display='block';
+  clearTimeout(t._h); t._h = setTimeout(()=>t.style.display='none', 5200); };
+const rid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random()));
+const escapeHtml = s => String(s??'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const show = id => $(id).classList.remove('hidden');
+const hide = id => $(id).classList.add('hidden');
+
+let TOKEN = '';
+async function api(path, body) {
+  const opt = body===undefined ? {} : {method:'POST',headers:{'Content-Type':'application/json','X-PKA-Token':TOKEN},body:JSON.stringify(body)};
+  opt.credentials = 'same-origin';  // task 模式用票据交换出的 pka_session cookie 认证
+  opt.cache = 'no-store';  // 状态接口永不走缓存：服务停止后必须真实失败，而不是显示旧数据
+  const ctrl = new AbortController();
+  opt.signal = ctrl.signal;
+  const timer = setTimeout(() => ctrl.abort(), 8000);  // 服务不可达时 fetch 可能长时间挂起，8 秒超时强制可见
+  try {
+    const res = await fetch(path, opt);
+    const data = await res.json().catch(()=>({error:'非 JSON 响应'}));
+    if (!res.ok) { const err = new Error(data.error || res.status); data.status = res.status; err.data = data; throw err; }
+    return data;
+  } catch (e) {
+    if (e.name === 'AbortError') { const err = new Error('服务未响应（超过 8 秒）——服务可能已停止'); err.isTimeout = true; throw err; }
+    throw e;
+  } finally { clearTimeout(timer); }
+}
+async function refreshVersion(){ try{ const s = await api('/api/state'); VERSION = s.version;
+  $('verMeta').textContent = 'state v'+VERSION; }catch(e){} }
+function saveViewState(){ sessionStorage.setItem('pka_view', JSON.stringify(view));
+  sessionStorage.setItem('pka_sel', selectedId||'');
+  sessionStorage.setItem('pka_filters', JSON.stringify({q:$('gq').value, domain:$('gDomain').value, layer:$('gLayer').value, status:$('gStatus').value})); }
+function loadViewState(){ try{ view = JSON.parse(sessionStorage.getItem('pka_view')) || view;
+  selectedId = sessionStorage.getItem('pka_sel') || null;
+  const f = JSON.parse(sessionStorage.getItem('pka_filters')||'null');
+  if (f){ $('gq').value=f.q||''; $('gDomain').value=f.domain||''; $('gLayer').value=f.layer||''; $('gStatus').value=f.status||''; } }catch(e){} }
+
+function showTab(name){
+  for (const s of ['graph','discovery','review','scan','nodes','ops','archive']) $('tab-'+s).classList.toggle('hidden', s!==name);
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
+  if (name==='graph') refreshGraph();
+  if (name==='review') refreshReview();
+  if (name==='discovery') loadDiscovery();
+  if (name==='nodes') refreshNodes();
+  if (name==='ops') fillSelects();
+  if (name==='archive') refreshArchive();
+}
+
+/* ============ 图谱 ============ */
+async function refreshGraph(manual){
+  try{
+    const q = new URLSearchParams({q:$('gq').value, domain:$('gDomain').value, layer:$('gLayer').value, status:$('gStatus').value});
+    graph = await api('/api/graph?'+q);
+    VERSION = graph.version;  // 图谱响应自带版本号：外部写入后本页版本随之同步，避免下一次写操作 409
+    $('verMeta').textContent = 'state v'+VERSION;
+    hide('graphOverlay');
+    renderGraph();
+  }catch(e){
+    const msg = (e.data&&e.data.error)||e.message;
+    showOverlay(`<div><h3 class="err-text">图谱数据读取失败</h3><p class="muted">${escapeHtml(msg)}</p>
+      <p class="muted">如果服务刚启动失败（如状态文件损坏），请查看服务端控制台提示后运行恢复，再点重试。</p>
+      <button class="primary" onclick="refreshGraph()">重试</button></div>`);
+    if (manual) toast(msg, true);
+  }
+}
+function showOverlay(html){ const o=$('graphOverlay'); o.innerHTML=html; show('graphOverlay'); }
+function hideOverlay(){ hide('graphOverlay'); }
+
+function renderGraph(){
+  const g = graph;
+  $('stTotal').textContent = g.stats.active_total;
+  $('stMastery').textContent = g.stats.mastery;
+  $('stVision').textContent = g.stats.vision;
+  $('stFiltered').textContent = g.stats.filtered;
+  $('hiddenNote').textContent = (g.hidden_edges>0 ? `已隐藏 ${g.hidden_edges} 条与被筛掉/归档节点相关的关系` : '')
+    + (g.excluded_archived>0 ? ` · 归档节点 ${g.excluded_archived} 个未显示（见"归档与恢复"）` : '');
+  const ds = $('gDomain'); const cur = ds.value;
+  ds.innerHTML = '<option value="">全部领域</option>' + (g.domains||[]).map(d=>`<option>${escapeHtml(d)}</option>`).join('');
+  ds.value = cur;
+
+  // 确定性布局：层带内按（领域,名称,ID）排序网格放置，刷新不洗牌
+  const order = {mastery:0, vision:1};
+  const sorted = [...g.nodes].sort((a,b)=>
+    order[a.layer]-order[b.layer] || a.domain.localeCompare(b.domain,'zh') || a.name.localeCompare(b.name,'zh') || a.id.localeCompare(b.id));
+  positions = {};
+  const W=1600, colW=200, rowH=104, perRow=7;
+  const counters = {mastery:{i:0}, vision:{i:0}};
+  const bandTop = {mastery:80, vision:520};
+  for (const n of sorted){
+    const c = counters[n.layer]; const col = c.i % perRow, row = Math.floor(c.i/perRow);
+    const x = 50 + col*colW, y = bandTop[n.layer] + row*rowH;
+    positions[n.id] = {x, y};
+    c.i++;
+  }
+  // 边（只连可见节点——服务端已保证）
+  const eg = $('edgeLayer'); eg.innerHTML='';
+  if (!edgesHidden){
+    for (const e of g.edges){
+      const p1 = positions[e.from_id], p2 = positions[e.to_id];
+      if (!p1 || !p2) continue;
+      const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.setAttribute('x1', p1.x+85); line.setAttribute('y1', p1.y+32);
+      line.setAttribute('x2', p2.x+85); line.setAttribute('y2', p2.y+32);
+      line.setAttribute('class', 'edge '+e.relation);
+      if (e.relation!=='related') line.setAttribute('marker-end', e.relation==='prerequisite'?'url(#arrG)':'url(#arrP)');
+      const tip = document.createElementNS('http://www.w3.org/2000/svg','title');
+      const nm = id => (g.nodes.find(n=>n.id===id)||{}).name || id;
+      tip.textContent = `${nm(e.from_id)} --${e.relation}--> ${nm(e.to_id)}`;
+      line.appendChild(tip);
+      eg.appendChild(line);
+    }
+  }
+  // 节点
+  const ng = $('nodeLayer'); ng.innerHTML='';
+  const statusText = {passed:'掌握', untested:'未测验', failed:'未通过'};
+  for (const n of sorted){
+    const p = positions[n.id];
+    const grp = document.createElementNS('http://www.w3.org/2000/svg','g');
+    grp.setAttribute('class', 'node-g'+(n.id===selectedId?' selected':''));
+    grp.setAttribute('transform', `translate(${p.x},${p.y})`);
+    grp.dataset.id = n.id;
+    const short = n.name.length>15 ? n.name.slice(0,15)+'…' : n.name;
+    grp.innerHTML =
+      `<rect class="node-rect ${n.layer}" width="170" height="64" rx="8"></rect>`+
+      `<rect class="node-stripe ${n.layer}" x="0" y="8" width="4" height="48" rx="2"></rect>`+
+      `<text class="node-text" x="12" y="22">${escapeHtml(short)}</text>`+
+      `<text class="node-sub" x="12" y="40">${escapeHtml(n.domain)} · ${statusText[n.status]}</text>`+
+      `<text class="node-sub" x="12" y="55">${n.scope.length>20?escapeHtml(n.scope.slice(0,20))+'…':escapeHtml(n.scope)}</text>`+
+      `<title>${escapeHtml(n.name)}\n领域：${escapeHtml(n.domain)}\n状态：${n.status}（${n.layer==='mastery'?'掌握层':'视野层'}）\n范围：${escapeHtml(n.scope)}</title>`;
+    grp.addEventListener('click', ev=>{ ev.stopPropagation(); openGraphNode(n.id); });
+    ng.appendChild(grp);
+  }
+  if (selectedId && !positions[selectedId]){ selectedId=null; hide('detailSide'); }
+  if (selectedId && positions[selectedId]) highlightSelection();
+  // 节点集合变化（搜索/筛选）后：若有节点落在当前视口外，自动适应视图，
+  // 保证筛选结果真实可点击（点击落点不会被图例/面板截胡）。普通刷新保留视角。
+  const sig = sorted.map(n=>n.id).join('|');
+  if (sig !== window.__lastNodeSig){
+    window.__lastNodeSig = sig;
+    const svg0 = $('graphSvg');
+    const outside = sorted.some(n=>{
+      const p = positions[n.id];
+      const sx = (p.x+85)*view.k+view.tx, sy = (p.y+32)*view.k+view.ty;
+      return sx<40 || sy<40 || sx>svg0.clientWidth-40 || sy>svg0.clientHeight-40;
+    });
+    if (outside) fitView();
+  }
+  applyFocus();
+  // 空态
+  if (g.nodes.length===0){
+    const filtered = $('gq').value||$('gDomain').value||$('gLayer').value||$('gStatus').value;
+    showOverlay(filtered
+      ? `<div><h3>没有匹配当前筛选的节点</h3><button class="primary" onclick="clearFilters()">清除筛选</button></div>`
+      : `<div><h3>还没有可见节点</h3><p class="muted">先去「扫描与导入」接入笔记，或在「节点管理」新建节点。</p>
+         <button onclick="showTab('scan')">去扫描与导入</button>
+         <button onclick="showTab('nodes');toggleCreate()">去新建节点</button></div>`);
+  }
+  applyView();
+  saveViewState();
+}
+
+function ensureVisible(id){
+  // 选中节点若被详情面板遮挡或超出视口，自动平移到可见区域
+  const p = positions[id]; if (!p) return;
+  const svg = $('graphSvg');
+  const sx = (p.x + 85) * view.k + view.tx, sy = (p.y + 32) * view.k + view.ty;
+  const panelW = $('detailSide').classList.contains('hidden') ? 0 : 400;
+  if (sx < 0 || sy < 0 || sx > svg.clientWidth - panelW || sy > svg.clientHeight){
+    centerOn(id);
+    if (panelW){ view.tx -= panelW / 2; applyView(); saveViewState(); }
+  }
+}
+function openGraphNode(id){
+  selectedId = id; saveViewState();
+  ensureVisible(id);
+  highlightSelection();
+  api('/api/node/'+id).then(d=>{
+    const n = d.node;
+    const layerText = n.status==='passed' ? '掌握层' : '视野层';
+    const review = n.last_quiz_at ? escapeHtml(n.last_quiz_at) : '尚未安排';
+    const nextR = n.next_review_at ? escapeHtml(n.next_review_at) : '尚未安排';
+    let html = `<div class="row" style="justify-content:flex-end;margin:0"><button onclick="closeDetail()">✕ 关闭</button></div>
+      <h3>${escapeHtml(n.name)}</h3>
+      <p class="muted">${n.id} · ${escapeHtml(n.domain)}</p>
+      <p><span class="tag ${n.status}">${n.status} · ${layerText}</span>
+      <span class="muted">内容版本 v${n.content_version}${n.status_origin==='demo'?' · <b class="warn-text">状态来源：演示（测试数据，非真实测验）</b>':''}</span></p>
+      <p><label class="small">范围</label><br>${escapeHtml(n.scope)}</p>
+      <p class="muted">最近测验：${review} · 下次复习：${nextR}<br>
+      <span class="warn-text">测验与复习功能在后续阶段提供；当前界面不提供任何绕过测验的通过入口。</span></p>
+      ${(n.aliases&&n.aliases.length)?`<p class="muted">别名：${escapeHtml(n.aliases.join('、'))}</p>`:''}
+      <h4>关联笔记（${d.note_links.length}）</h4>`;
+    for (const l of d.note_links){
+      const label = l.path || (l.ref.kind==='note_id' ? l.ref.note_id : l.ref.registry_id);
+      html += `<div class="row"><button onclick="openNote('${l.link_id}')">查看原文</button>
+        <span class="${l.missing_registry?'err-text':'muted'}" style="flex:1">${escapeHtml(label||'(无定位)')}</span></div>`;
+    }
+    if (!d.note_links.length) html += '<p class="muted">（无关联笔记）</p>';
+    html += `<h4>关系（${d.relations.length}）</h4>`;
+    for (const r of d.relations){
+      const other = r.from_id===n.id ? (r.to_name||r.to_id) : (r.from_name||r.from_id);
+      const meaning = r.relation==='prerequisite' ? (r.from_id===n.id?'本节点是对方的前置':'对方是本节点的前置')
+        : r.relation==='extends' ? (r.from_id===n.id?'本节点延伸自对方':'对方延伸自本节点') : '相关';
+      html += `<div class="row"><a href="javascript:void(0)" onclick="openGraphNode('${r.from_id===n.id?r.to_id:r.from_id}');centerOn('${r.from_id===n.id?r.to_id:r.from_id}')">${escapeHtml(other)}</a>
+        <span class="muted">${r.relation}（${meaning}）</span></div>`;
+    }
+    if (!d.relations.length) html += '<p class="muted">（无关系——孤立节点也可以正常查看）</p>';
+    if (n.status !== 'passed'){
+      html += `<div class="row" style="margin-top:10px">
+        <button class="primary" onclick="startQuiz('${n.id}')">开始掌握测验</button>
+        <button onclick="editFromGraph('${n.id}')">编辑节点</button>
+        <button class="danger" onclick="archiveFromGraph('${n.id}')">归档（可恢复）</button></div>`;
+    } else {
+      html += `<div class="confirmtip" style="margin-top:10px">已掌握（passed）。独立复测请通过「开始复习」（到期后可用）进行；未通过会回到视野层。</div>
+      <div class="row" style="margin-top:6px">
+        <button class="primary" onclick="startQuiz('${n.id}','review')">开始复习（到期后）</button>
+        <button onclick="editFromGraph('${n.id}')">编辑节点</button>
+        <button class="danger" onclick="archiveFromGraph('${n.id}')">归档（可恢复）</button></div>`;
+    }
+    $('detailSide').innerHTML = html;
+    show('detailSide');
+    applyFocus();
+  }).catch(e=>toast((e.data&&e.data.error)||e.message, true));
+}
+function closeDetail(){
+  selectedId = null;
+  hide('detailSide');
+  highlightSelection();
+  applyFocus();
+  saveViewState();
+}
+function highlightSelection(){
+  document.querySelectorAll('.node-g').forEach(g=>g.classList.toggle('selected', g.dataset.id===selectedId));
+}
+function applyFocus(){
+  const on = $('focusChk').checked && selectedId;
+  const neighbors = new Set();
+  if (on && graph){
+    neighbors.add(selectedId);
+    for (const e of graph.edges){
+      if (e.from_id===selectedId) neighbors.add(e.to_id);
+      if (e.to_id===selectedId) neighbors.add(e.from_id);
+    }
+  }
+  document.querySelectorAll('.node-g').forEach(g=>g.classList.toggle('dim', !!on && !neighbors.has(g.dataset.id)));
+  document.querySelectorAll('.edge').forEach(l=>l.classList.toggle('dim', !!on));
+}
+function centerOn(id){
+  const p = positions[id]; if (!p) return;
+  const svg = $('graphSvg');
+  view.tx = svg.clientWidth/2 - (p.x+85)*view.k;
+  view.ty = svg.clientHeight/2 - (p.y+32)*view.k;
+  applyView(); saveViewState();
+}
+function applyView(){
+  $('viewport').setAttribute('transform', `translate(${view.tx},${view.ty}) scale(${view.k})`);
+}
+function fitView(){
+  const svg = $('graphSvg');
+  if (!positions || !Object.keys(positions).length) { resetView(); return; }
+  let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9;
+  for (const p of Object.values(positions)){
+    minX=Math.min(minX,p.x); minY=Math.min(minY,p.y); maxX=Math.max(maxX,p.x+170); maxY=Math.max(maxY,p.y+64);
+  }
+  const k = Math.min(3, Math.max(0.2, Math.min(svg.clientWidth/(maxX-minX+60), svg.clientHeight/(maxY-minY+60))));
+  view.k = k;
+  view.tx = (svg.clientWidth - (maxX+minX)*k)/2;
+  view.ty = (svg.clientHeight - (maxY+minY)*k)/2;
+  applyView(); saveViewState();
+}
+function resetView(){ view = {tx:0, ty:0, k:1}; applyView(); fitView(); }
+function toggleEdges(){
+  edgesHidden = !edgesHidden;
+  $('edgeToggle').textContent = edgesHidden ? '显示关系' : '隐藏关系';
+  renderGraph();
+}
+function clearFilters(){
+  $('gq').value=''; $('gDomain').value=''; $('gLayer').value=''; $('gStatus').value='';
+  refreshGraph();
+}
+
+// 画布拖动 + 缩放
+(function(){
+  const svg = $('graphSvg');
+  let dragging=null;
+  svg.addEventListener('mousedown', e=>{
+    if (e.target.closest('.node-g')) return;
+    dragging = {x:e.clientX, y:e.clientY, tx:view.tx, ty:view.ty};
+    svg.classList.add('panning');
+  });
+  window.addEventListener('mousemove', e=>{
+    if (!dragging) return;
+    view.tx = dragging.tx + (e.clientX-dragging.x);
+    view.ty = dragging.ty + (e.clientY-dragging.y);
+    applyView();
+  });
+  window.addEventListener('mouseup', ()=>{ if (dragging){ dragging=null; svg.classList.remove('panning'); saveViewState(); } });
+  svg.addEventListener('click', e=>{
+    if (!e.target.closest('.node-g')) closeDetail();  // 点空白处关闭详情，露出被面板挡住的节点
+  });
+  svg.addEventListener('wheel', e=>{
+    e.preventDefault();
+    const factor = e.deltaY<0 ? 1.12 : 1/1.12;
+    const nk = Math.min(3, Math.max(0.2, view.k*factor));
+    const rect = svg.getBoundingClientRect();
+    const mx = e.clientX-rect.left, my = e.clientY-rect.top;
+    view.tx = mx - (mx-view.tx)*(nk/view.k);
+    view.ty = my - (my-view.ty)*(nk/view.k);
+    view.k = nk;
+    applyView(); saveViewState();
+  }, {passive:false});
+})();
+
+/* ---- 原文阅读（安全渲染） ---- */
+async function openNote(linkId){
+  try{
+    const r = await api('/api/note/'+linkId);
+    $('notePath').textContent = r.path||'';
+    if (r.status!=='ok'){
+      $('noteTitle').textContent = '无法读取原文';
+      $('noteBody').innerHTML = `<div class="confirmtip err-text">${escapeHtml(r.message||'未知原因')}</div>`;
+      show('noteModal'); return;
+    }
+    $('noteTitle').textContent = r.title || '原文';
+    let warnHtml = (r.warnings||[]).map(w=>`<div class="confirmtip warn-text">${escapeHtml(w)}</div>`).join('');
+    $('noteBody').innerHTML = warnHtml + renderSafeMarkdown(r.content||'');
+    show('noteModal');
+  }catch(e){ toast((e.data&&e.data.error)||e.message, true); }
+}
+function renderSafeMarkdown(text){
+  // 先整体转义，再叠加最小 Markdown 变换；内容永远不作为 HTML 注入
+  const esc = escapeHtml(text);
+  const lines = esc.split('\n');
+  let html = '', inList = false;
+  const inline = s => s
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>');
+  for (const raw of lines){
+    const line = raw.replace(/\s+$/,'');
+    if (/^###\s/.test(line)){ if(inList){html+='</ul>';inList=false;} html += `<h3>${inline(line.slice(4))}</h3>`; }
+    else if (/^##\s/.test(line)){ if(inList){html+='</ul>';inList=false;} html += `<h2>${inline(line.slice(3))}</h2>`; }
+    else if (/^#\s/.test(line)){ if(inList){html+='</ul>';inList=false;} html += `<h1>${inline(line.slice(2))}</h1>`; }
+    else if (/^-\s/.test(line)){ if(!inList){html+='<ul>';inList=true;} html += `<li>${inline(line.slice(2))}</li>`; }
+    else if (/^&gt;\s?/.test(line)){ if(inList){html+='</ul>';inList=false;} html += `<blockquote>${inline(line.replace(/^&gt;\s?/,''))}</blockquote>`; }
+    else if (line.trim()===''){ if(inList){html+='</ul>';inList=false;} }
+    else { if(inList){html+='</ul>';inList=false;} html += `<p>${inline(line)}</p>`; }
+  }
+  if (inList) html += '</ul>';
+  return html;
+}
+
+/* ---- 图谱上的编辑/归档入口（复用既有能力） ---- */
+function editFromGraph(id){ showTab('nodes'); setTimeout(()=>openNode(id), 300); }
+async function archiveFromGraph(id){
+  if (!confirm('归档该节点？归档可恢复；关联笔记与原始文件不受影响；节点将从图谱与统计中消失。')) return;
+  try{ await api('/api/nodes/archive', {node_id:id, request_id:rid(), base_version:VERSION});
+    toast('已归档（图谱与统计已排除）'); await refreshVersion(); selectedId=null; hide('detailSide');
+    refreshGraph(); saveViewState();
+  }catch(e){ handleErr(e); }
+}
+
+/* ============ 扫描与导入 ============ */
+async function doScan(which){
+  const report = await api('/api/scan', {which});
+  currentScan = report; currentScan._which = which;
+  renderScan(report, which);
+}
+function renderScan(r, which){
+  $('scanStats').textContent = `扫描 ${which==='real'?'真实知识库（只读）':'测试知识库'}：目标笔记 ${r.stats.target_total}`
+    + `（正式 ${r.stats.formal} / 候选 ${r.stats.candidate}），有 ID ${r.stats.with_id}，无 ID ${r.stats.without_id}，`
+    + `跳过非目标 ${r.skipped_non_target}，重复 ID ${Object.keys(r.duplicate_ids).length}，解析异常 ${r.unreadable.length}`;
+  const near = r.near_target_excluded||[];
+  $('scanNear').textContent = near.length
+    ? '易混淆排除（非知识笔记，已显式排除）：' + near.map(n=>`${n.path}（${n.reason}）`).join('；')
+    : '';
+  const tb = $('scanTable').querySelector('tbody'); tb.innerHTML = '';
+  const importable = [];
+  for (const e of r.target_notes){
+    const tr = document.createElement('tr');
+    const conflicted = !!e.duplicate_of;
+    const identity = e.note_id ? (conflicted ? '重复 ID ⚠' : '稳定 ID') : '路径+指纹登记';
+    const warns = [];
+    if (e.missing_fields.length) warns.push('缺字段: '+e.missing_fields.join('/'));
+    if (conflicted) warns.push('与 '+e.duplicate_of.filter(p=>p!==e.path).join(', ')+' ID 冲突');
+    tr.innerHTML = `<td><input type="checkbox" class="pick" data-path="${e.path}" ${conflicted?'disabled':''}></td>
+      <td>${e.note_id||'<span class="muted">—</span>'}</td>
+      <td>${escapeHtml(e.title)}</td><td>${e.domain||'—'}</td>
+      <td><span class="tag ${e.audit_status||''}">${e.audit_status||'—'}</span></td>
+      <td>${identity}</td><td class="${warns.length?'warn-text':'muted'}">${warns.join('；')||'—'}</td>`;
+    tb.appendChild(tr);
+    if (!conflicted) importable.push(e.path);
+  }
+  currentScan.importable = importable;
+  show('importPanel');
+  fillAssignSelect();
+}
+function fillAssignSelect(){
+  const sel = $('assignNode'); sel.innerHTML = '<option value="">（仅登记，不关联节点）</option>';
+  api('/api/nodes').then(d=>{
+    for (const n of d.nodes){ const o=document.createElement('option'); o.value=n.id; o.textContent=`${n.name}（${n.status}）`; sel.appendChild(o);}
+  });
+}
+async function buildPreview(){
+  const paths = [...document.querySelectorAll('.pick:checked')].map(c=>c.dataset.path);
+  if (!paths.length) return toast('先勾选要接入的笔记', true);
+  const node_id = $('assignNode').value;
+  const assignments = node_id ? paths.map(p=>({path:p, node_id})) : [];
+  previewPayload = {paths, assignments};
+  const preview = await api('/api/import/preview', {...previewPayload, which: currentScan._which||'test'});
+  $('previewBox').textContent = JSON.stringify(preview, null, 2);
+  $('assignTarget').textContent = node_id ? $('assignNode').selectedOptions[0].textContent : '（无）';
+  $('applyBtn').disabled = false;
+}
+async function applyImport(){
+  if (!previewPayload) return;
+  try{
+    const out = await api('/api/import/apply', {...previewPayload, request_id: rid(), base_version: VERSION});
+    toast('已写入测试库管理区：登记 '+out.registered.length+'，关联 '+out.note_links.length+(out.replayed?'（幂等重放）':''));
+    await refreshVersion();
+    $('applyBtn').disabled = true; previewPayload = null;
+  }catch(e){ handleErr(e); }
+}
+
+/* ============ 节点管理 ============ */
+async function refreshNodes(){
+  const q = new URLSearchParams({name:$('fName').value||'', domain:$('fDomain').value||'', status:$('fStatus').value||''});
+  const d = await api('/api/nodes?'+q);
+  const tb = $('nodeTable').querySelector('tbody'); tb.innerHTML='';
+  const domains = new Set();
+  for (const n of d.nodes){
+    domains.add(n.domain);
+    const links = await countLinks(n.id);
+    const tr = document.createElement('tr');
+    tr.style.cursor='pointer'; tr.onclick=()=>openNode(n.id);
+    tr.innerHTML = `<td><span class="tag ${n.status}">${n.status}</span></td><td>${escapeHtml(n.name)}</td>
+      <td>${escapeHtml(n.domain)}</td><td class="muted">${escapeHtml(n.scope||'')}</td><td>${links}</td><td class="muted">${n.id}</td>`;
+    tb.appendChild(tr);
+  }
+  const ds = $('fDomain'); const cur = ds.value;
+  ds.innerHTML = '<option value="">全部领域</option>' + [...domains].map(d=>`<option>${escapeHtml(d)}</option>`).join('');
+  ds.value = cur;
+}
+async function countLinks(id){ const d = await api('/api/node/'+id); return d.note_links.length; }
+function toggleCreate(){ $('createBox').classList.toggle('hidden'); }
+async function createNode(){
+  try{
+    const out = await api('/api/nodes/create', {name:$('cName').value, domain:$('cDomain').value,
+      scope:$('cScope').value, aliases:$('cAliases').value.split(','), request_id: rid(), base_version: VERSION});
+    toast('已创建 '+out.node.id+'（untested）'); await refreshVersion(); refreshNodes();
+  }catch(e){ handleErr(e); }
+}
+async function openNode(id){
+  const d = await api('/api/node/'+id);
+  currentNode = d;
+  show('detailPanel');
+  $('nodeQuizBtn').classList.toggle('hidden', d.node.status === 'passed');
+  $('dTitle').textContent = d.node.name;
+  $('dMeta').textContent = `${d.node.id} · 领域 ${d.node.domain} · 状态 ${d.node.status}（${d.node.status==='passed'?'掌握层':'视野层'}）· 内容版本 v${d.node.content_version} · 创建 ${d.node.created_at}`;
+  $('eName').value = d.node.name; $('eAliases').value = (d.node.aliases||[]).join(', ');
+  $('eDomain').value = d.node.domain; $('eScope').value = d.node.scope;
+  hide('scopeTip');
+  const lt = $('linkTable').querySelector('tbody'); lt.innerHTML='';
+  for (const l of d.note_links){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${escapeHtml(l.path||l.ref.note_id||l.ref.registry_id)}</td>
+      <td class="muted">${l.ref.kind==='note_id'?'按稳定 ID':'按登记指纹'}${l.missing_registry?' <b class="err-text">登记缺失</b>':''}</td>
+      <td><button onclick="openNote('${l.link_id}')">原文</button></td>`;
+    lt.appendChild(tr);
+  }
+  if (!d.note_links.length) lt.innerHTML = '<tr><td class="muted">（无关联笔记）</td></tr>';
+  const rt = $('relTable').querySelector('tbody'); rt.innerHTML='';
+  for (const r of d.relations){
+    const tr = document.createElement('tr');
+    const arrow = r.from_id===id ? '→' : '←';
+    const other = r.from_id===id ? `${r.to_name||r.to_id}` : `${r.from_name||r.from_id}`;
+    const meaning = r.relation==='prerequisite'
+      ? (r.from_id===id ? '本节点是对方的前置' : '对方是本节点的前置')
+      : r.relation==='extends' ? (r.from_id===id ? '本节点延伸自对方' : '对方延伸自本节点') : '相关';
+    tr.innerHTML = `<td>${arrow} ${escapeHtml(other)}</td><td class="muted">${r.relation}（${meaning}）</td>
+      <td><button class="danger" onclick="removeRel('${r.link_id}')">移除</button></td>`;
+    rt.appendChild(tr);
+  }
+  if (!d.relations.length) rt.innerHTML = '<tr><td class="muted">（无关系）</td></tr>';
+  const sel = $('relTarget'); sel.innerHTML='';
+  const all = await api('/api/nodes?archived=0');
+  for (const n of all.nodes) if (n.id!==id){ const o=document.createElement('option'); o.value=n.id; o.textContent=n.name; sel.appendChild(o);}
+}
+async function saveNode(confirmScope=false){
+  if (!currentNode) return;
+  const changes = {name:$('eName').value, aliases:$('eAliases').value.split(','),
+    domain:$('eDomain').value, scope:$('eScope').value};
+  const orig = currentNode.node;
+  const scopeChanged = changes.scope !== orig.scope;
+  try{
+    const out = await api('/api/nodes/update', {node_id: orig.id, changes,
+      confirm_scope_change: confirmScope, request_id: rid(), base_version: VERSION});
+    toast(out.scope_changed ? '范围已修改，节点回到 untested' : '已保存（掌握状态不变）');
+    await refreshVersion(); openNode(orig.id); refreshNodes();
+  }catch(e){
+    if (e.data && e.data.status===428){ show('scopeTip');
+      toast('范围变化需要确认：'+ (e.data.preview?.effect||''), true); }
+    else handleErr(e);
+  }
+}
+async function removeRel(linkId){
+  try{ await api('/api/relations/remove', {link_id:linkId, request_id:rid(), base_version:VERSION});
+    toast('关系已移除'); await refreshVersion(); openNode(currentNode.node.id);
+  }catch(e){ handleErr(e); }
+}
+async function addRelation(){
+  const dir = $('relDir').value, type = $('relType').value, target = $('relTarget').value;
+  if (!target) return toast('选择对方节点', true);
+  const from = dir==='out' ? currentNode.node.id : target;
+  const to = dir==='out' ? target : currentNode.node.id;
+  try{ await api('/api/relations/add', {from_id:from, to_id:to, relation:type, request_id:rid(), base_version:VERSION});
+    toast('关系已添加'); await refreshVersion(); openNode(currentNode.node.id);
+  }catch(e){ handleErr(e); }
+}
+async function archiveCurrent(){
+  if (!currentNode) return;
+  if (!confirm(`归档「${currentNode.node.name}」？归档可恢复；关联笔记与原始文件不受影响。`)) return;
+  try{ await api('/api/nodes/archive', {node_id:currentNode.node.id, request_id:rid(), base_version:VERSION});
+    toast('已归档'); await refreshVersion(); hide('detailPanel'); refreshNodes();
+  }catch(e){ handleErr(e); }
+}
+
+/* ============ 合并 / 拆分 ============ */
+async function fillSelects(){
+  const d = await api('/api/nodes');
+  for (const id of ['mSrc','mDst','sSrc']){
+    const sel=$(id); const cur=sel.value; sel.innerHTML='';
+    for (const n of d.nodes){ const o=document.createElement('option'); o.value=n.id; o.textContent=n.name; sel.appendChild(o); }
+    sel.value = cur;
+  }
+}
+async function mergePreview(){
+  mergePlan = {source_id:$('mSrc').value, target_id:$('mDst').value};
+  if (mergePlan.source_id===mergePlan.target_id) return toast('源与目标不能相同', true);
+  const p = await api('/api/merge/preview', mergePlan);
+  $('mergePreviewBox').textContent = JSON.stringify(p, null, 2);
+  $('mergeApplyBtn').disabled = false;
+}
+async function mergeApply(){
+  try{ const out = await api('/api/merge/apply', {...mergePlan, request_id:rid(), base_version:VERSION});
+    toast(`合并完成：笔记关联迁移 ${out.moved_note_links}，关系迁移 ${out.migrated_relations.length}，丢弃 ${out.dropped_relations.length}`);
+    await refreshVersion(); $('mergeApplyBtn').disabled=true;
+  }catch(e){ handleErr(e); }
+}
+async function splitPreview(){
+  const parts = [{name:$('sAName').value, scope:$('sAScope').value},{name:$('sBName').value, scope:$('sBScope').value}];
+  splitPlan = {source_id:$('sSrc').value, parts};
+  const p = await api('/api/split/preview', splitPlan);
+  $('splitPreviewBox').textContent = JSON.stringify(p, null, 2);
+  const box = $('splitAssign'); box.innerHTML='<h4>关联去向（0=A，1=B，留空=留在归档源节点）</h4>';
+  for (const l of p.note_links){
+    const row = document.createElement('div'); row.className='row';
+    row.innerHTML = `<label class="small" style="flex:1">${escapeHtml(l.ref.note_id||l.ref.registry_id)}</label>
+      <select class="sassign" data-link="${l.link_id}"><option value="">留档</option><option value="0">A</option><option value="1">B</option></select>`;
+    box.appendChild(row);
+  }
+  $('splitApplyBtn').disabled = false;
+}
+async function splitApply(){
+  const note_link_assignments = {};
+  document.querySelectorAll('.sassign').forEach(s=>{ if(s.value!=='') note_link_assignments[s.dataset.link]=Number(s.value); });
+  try{ const out = await api('/api/split/apply', {...splitPlan, note_link_assignments, request_id:rid(), base_version:VERSION});
+    toast('拆分完成：新节点 '+out.new_nodes.map(n=>n.name+'('+n.id+')').join('、')+'，均 untested');
+    await refreshVersion(); refreshNodes();
+  }catch(e){ handleErr(e); }
+}
+
+/* ============ 归档 ============ */
+async function refreshArchive(){
+  const d = await api('/api/nodes?archived=1');
+  const tb = $('archiveTable').querySelector('tbody'); tb.innerHTML='';
+  for (const n of d.nodes.filter(n=>n.archived)){
+    const note = n.archive_note||{};
+    const tr = document.createElement('tr');
+    const desc = note.reason==='merged' ? `已并入 ${note.into}` : note.reason==='split' ? `拆分为 ${(note.into||[]).join(', ')}` : (note.reason||'手动归档');
+    tr.innerHTML = `<td>${escapeHtml(n.name)}</td><td>${escapeHtml(desc)}</td>
+      <td class="muted">${n.archived_at||''}</td>
+      <td class="muted">原状态 ${note.status_before||'—'}（恢复后为 untested）</td>
+      <td><button onclick="restoreNode('${n.id}')">恢复</button></td>`;
+    tb.appendChild(tr);
+  }
+  if (!d.nodes.some(n=>n.archived)) tb.innerHTML = '<tr><td colspan="5" class="muted">（暂无归档节点）</td></tr>';
+}
+async function restoreNode(id){
+  try{ await api('/api/nodes/restore', {node_id:id, request_id:rid(), base_version:VERSION});
+    toast('已恢复为 untested'); await refreshVersion(); refreshArchive();
+  }catch(e){ handleErr(e); }
+}
+
+/* ============ 知识发现 ============ */
+let discoveryStatus = null;
+async function loadDiscovery(){
+  try{
+    discoveryStatus = await api('/api/discovery/status');
+    const s = discoveryStatus;
+    $('discStatus').textContent = s.last_check ? ('距上次检查：' + escapeHtml(s.last_check.slice(0,16).replace('T',' '))) : '距上次检查：从未';
+    $('discLimit').textContent = s.per_check_limit;
+    $('discAuto').value = String(s.auto_check_minutes);
+    $('discSources').textContent = `已见过 ${s.seen} 条上游输入 · 待重试 ${s.pending} 条`;
+    $('discBanner').textContent = '';
+    try {
+      const ib = await api('/api/inbox/status');
+      const by = ib.by_status || {};
+      const counts = Object.entries(by).map(([k, v]) => `${k}:${v}`).join(' · ') || '尚无文件';
+      let taskLine = '';
+      if (ib.task_mode) {
+        try {
+          const caps = await api('/api/tasks/capabilities');
+          const items = (caps.capabilities || []).filter(c => (c.name || '').endsWith('_detail') || c.available === false);
+          const blocked = items.map(c => `${c.name}:${(c.reason||'').slice(0, 60)}`).join('；');
+          taskLine = `｜任务模式（${caps.pipeline_mode}）` + (blocked ? `｜未就绪：${blocked}` : '');
+        } catch(e) { taskLine = '｜任务模式（能力读取失败）'; }
+      }
+      $('inboxStatus').textContent =
+        `收件箱 ${ib.dir}（每 ${ib.interval_seconds}s 扫描，${ib.running ? '监听中' : '未运行'}）` +
+        `｜已处理 ${ib.processed_total} 个（${counts}）｜今日模型调用 ${ib.used_today}/${ib.daily_limit || '不限'}` +
+        `｜分析器：${ib.analyzer}｜${ib.note}` + taskLine;
+    } catch (e) { $('inboxStatus').textContent = '收件箱状态读取失败'; }
+  }catch(e){ handleErr(e); }
+}
+async function runDiscoveryCheck(){
+  try{
+    toast('正在检查知识增量…');
+    const out = await api('/api/discovery/check', {request_id: rid()});
+    await loadDiscovery(); renderSuggestions();
+    toast(`检查完成：处理 ${out.checked} 条，生成建议 ${out.created} 条，延后 ${out.deferred} 条`);
+  }catch(e){ handleErr(e); }
+}
+async function setDiscoveryAuto(v){
+  if (v !== '0' && !confirm(`启用周期检查（每 ${v} 分钟，仅应用运行期间有效；应用关闭不检查）？`)){
+    $('discAuto').value = String(discoveryStatus?.auto_check_minutes || 0); return;
+  }
+  try{ discoveryStatus = await api('/api/discovery/config', {auto_check_minutes: parseInt(v,10)});
+    toast(v === '0' ? '周期检查已关闭' : `周期检查已启用（每 ${v} 分钟）`); }
+  catch(e){ handleErr(e); }
+}
+async function renderSuggestions(){
+  const d = await api('/api/discovery/suggestions?status=pending');
+  const box = $('suggestionList');
+  if (d.orphan_notes.length){
+    box.innerHTML += `<div class="confirmtip warn-text">发现 ${d.orphan_notes.length} 个未关联的候选笔记孤儿（中断残留）：${d.orphan_notes.map(o=>escapeHtml(o.path)).join('、')}。重新接受对应建议即可复用文件。</div>`;
+  }
+  if (!d.suggestions.length){ box.innerHTML = '<p class="muted">当前没有待审核建议。每天可以没有新增知识。</p>'; return; }
+  let html = '';
+  for (const s of d.suggestions){
+    const c = s.contribution || {};
+    const srcRows = (s.sources||[]).map(src =>
+      `<li>[${escapeHtml(src.source_name||src.label||'来源')}] <a href="${escapeHtml(src.url||'#')}" target="_blank" rel="noopener noreferrer">${escapeHtml(String(src.url||'').slice(0,70))}</a>
+        · ${escapeHtml(src.read_status||'')} · 发布 ${escapeHtml(String(src.published_at||'未知'))}</li>`).join('');
+    const relRows = (s.related||[]).map(r =>
+      `<li><a href="javascript:void(0)" onclick="viewNodeFromReview('${r.node_id}')">${escapeHtml(r.name)}</a>（相似度 ${r.score}）</li>`).join('');
+    html += `<fieldset>
+      <div class="row"><b>${escapeHtml(s.name)}</b>
+        <span class="tag ${s.verdict==='new_node'?'formal':'candidate'}">${s.verdict}</span>
+        <span class="muted">${escapeHtml(s.novelty_label)}</span></div>
+      <p class="muted">建议动作：${escapeHtml(s.action)} · 判定理由：${escapeHtml(s.reason)}</p>
+      ${c.problem?`<p class="muted">要解决的问题：${escapeHtml(c.problem)}</p>`:''}
+      ${c.contribution_summary?`<p>知识贡献（来源声称）：${escapeHtml(c.contribution_summary)}</p>`:''}
+      ${(c.claims||[]).length?`<p class="muted">机制/方法表述（原文摘录）：</p><ul>${c.claims.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul>`:''}
+      ${(c.differences||[]).length?`<p class="muted">与旧方法区别：${c.differences.map(escapeHtml).join('；')}</p>`:''}
+      ${(c.conditions_limits||[]).length?`<p class="muted">适用条件/限制：${c.conditions_limits.map(escapeHtml).join('；')}</p>`:''}
+      <p class="muted">成熟度：${escapeHtml(c.maturity)} · 提取质量：${escapeHtml(c.extraction_quality)}</p>
+      <p class="muted">来源与读取范围：<ul>${srcRows}</ul></p>
+      ${relRows?`<p class="muted">相关旧节点：<ul>${relRows}</ul></p>`:''}
+      <div class="row">
+        ${s.verdict==='new_node'?`<button class="primary" onclick="openAcceptModal('${s.id}')">接受（创建候选节点）</button>`:''}
+        ${s.verdict==='supplement'?`<button class="primary" onclick="acceptSuggestion('${s.id}')">接受（补充资料关联）</button>`:''}
+        ${s.verdict==='revision'?`<button class="primary" onclick="acceptSuggestion('${s.id}')">接受（保存更新提案）</button>`:''}
+        <button onclick="laterSuggestion('${s.id}')">稍后</button>
+        <button onclick="dismissSuggestion('${s.id}')">忽略</button>
+      </div></fieldset>`;
+  }
+  box.innerHTML = html;
+}
+let pendingAccept = null;
+async function openAcceptModal(id){
+  const d = await api('/api/discovery/suggestions?status=all&limit=200');
+  const s = d.suggestions.find(x=>x.id===id); if (!s) return toast('建议不存在', true);
+  pendingAccept = s;
+  $('acceptKind').textContent = s.verdict;
+  $('acceptBody').innerHTML = `
+    <p class="muted">接受将：创建<b>候选笔记</b>（未自动发布）+ <b>untested 视野节点</b> + 节点-笔记关联。不触发掌握状态。</p>
+    <div class="row"><label class="small" style="width:70px">名称</label>
+      <input id="accName" style="flex:1" value="${escapeHtml(s.name.slice(0,80))}"></div>
+    <div class="row"><label class="small" style="width:70px">领域</label>
+      <input id="accDomain" style="flex:1" value="待分类领域"></div>
+    <div class="row"><label class="small" style="width:70px">范围</label></div>
+    <textarea id="accScope">${escapeHtml((s.contribution&&s.contribution.contribution_summary)||s.name)}</textarea>
+    <div class="row"><button class="primary" onclick="confirmAccept('${s.id}')">确认接受</button>
+      <span class="muted">重复点击幂等；写入仅针对测试知识库。</span></div>`;
+  show('acceptModal');
+}
+async function confirmAccept(id){
+  try{
+    const edits = {name: $('accName').value, domain: $('accDomain').value, scope: $('accScope').value,
+                   request_id: rid()};
+    const out = await api('/api/discovery/suggestion/accept', {suggestion_id: id, edits, request_id: rid()});
+    hide('acceptModal');
+    toast(`已接受：节点 ${out.node_id}（untested，视野层）+ 候选笔记 ${out.note}` + (out.replayed?'（幂等重放）':''));
+    await refreshVersion(); refreshGraph();
+    setTimeout(()=>renderSuggestions(), 200);
+  }catch(e){ handleErr(e); }
+}
+async function acceptSuggestion(id){
+  try{
+    const out = await api('/api/discovery/suggestion/accept', {suggestion_id: id, edits: {request_id: rid()}, request_id: rid()});
+    toast('已接受：' + (out.note||out.verdict)); await refreshVersion(); renderSuggestions();
+  }catch(e){ handleErr(e); }
+}
+async function laterSuggestion(id){
+  try{ await api('/api/discovery/suggestion/set-status', {suggestion_id: id, status: 'later'});
+    toast('已移入稍后处理'); renderSuggestions(); }catch(e){ handleErr(e); }
+}
+async function dismissSuggestion(id){
+  if (!confirm('忽略这条建议？（忽略不等于不会，也不会写入任何兴趣画像）')) return;
+  try{ await api('/api/discovery/suggestion/set-status', {suggestion_id: id, status: 'dismissed'});
+    toast('已忽略'); renderSuggestions(); }catch(e){ handleErr(e); }
+}
+
+/* ============ 待复习 ============ */
+let reviewPollTimer = null;
+async function refreshReview(){
+  try{ const o = await api('/api/review/overview'); renderReview(o); }
+  catch(e){ handleErr(e); }
+}
+async function refreshReviewInner(){ try{ const o = await api('/api/review/overview'); renderReview(o); }catch(e){} }
+function renderReview(o){
+  const s = o.settings;
+  const badge = o.counts.overdue + o.counts.today;
+  $('reviewBadge').textContent = badge ? `(${badge} 到期)` : '';
+  $('reviewBadge2').textContent = badge ? `待复习 ${badge} 项到期` : '';
+  $('reviewSettings').innerHTML = `
+    <div class="row">
+      <span>复习：${s.enabled?'<b class="stat-master">已启用</b>（确认于 '+escapeHtml(s.confirmed_at||'—')+'）':'<b class="warn-text">未启用</b>'}</span>
+      <span class="muted">当前间隔：${s.intervals.join(' / ')} 天</span>
+      ${s.enabled?'':'<button class="primary" onclick="enableReviewFlow()">启用复习计划</button>'}
+      ${s.enabled?'<button onclick="disableReviewFlow()">停用</button>':''}
+    </div>
+    <div class="row">
+      <label class="small">间隔（天，逗号分隔）：<input id="riInput" value="${s.intervals.join(',')}" style="width:170px"></label>
+      <button onclick="changeIntervals()">修改间隔</button>
+      <button onclick="recalcPreviewFlow()">按新间隔重算已有安排（先预览）</button>
+      ${s.enabled?'':'<span class="muted">未启用时测验通过不排期，节点显示"尚未安排"。</span>'}
+    </div>`;
+  const g = o.groups;
+  const groupDef = [
+    ['overdue', '已逾期'], ['today', '今日到期'], ['upcoming', '未来安排'],
+    ['unarranged', '尚未安排'], ['paused', '已暂停'], ['relearn', '待重学（未通过）'],
+  ];
+  let html = '';
+  for (const [key, label] of groupDef){
+    const items = g[key];
+    if (!items.length) continue;
+    html += `<h4>${label}（${items.length}）</h4><table><tbody>`;
+    for (const it of items){
+      const dueText = it.due_sh ? it.due_sh.replace('T',' ').slice(0,16) : '—';
+      const extra = it.overdue_days!=null ? ` <b class="err-text">逾期 ${it.overdue_days} 天</b>` : '';
+      const snoozed = it.snoozed ? ` <span class="muted">（提醒已推迟）</span>` : '';
+      html += `<tr><td style="width:38%"><b>${escapeHtml(it.name)}</b>
+        <span class="muted">${escapeHtml(it.domain)} · ${it.status}${it.last_review_result==='failed'?' · 上次未通过':''}${it.status_origin==='demo'?' · 演示':''}</span></td>
+        <td>${dueText}${extra}${snoozed}</td>
+        <td class="row">
+          ${(key==='overdue'||key==='today')?`<button class="primary" onclick="startQuiz('${it.node_id}','review')">开始复习</button>`:''}
+          <button onclick="viewNodeFromReview('${it.node_id}')">查看节点</button>
+          ${(key==='overdue'||key==='today')?`<button onclick="snoozeReview('${it.node_id}', 8)">稍后提醒 8h</button>`:''}
+          ${it.review_paused?`<button onclick="resumeReview('${it.node_id}')">恢复</button>`
+                            :((key!=='paused')?`<button onclick="pauseReview('${it.node_id}')">暂停</button>`:'')}
+        </td></tr>`;
+    }
+    html += '</tbody></table>';
+  }
+  if (!html) html = '<p class="muted">当前没有到期、暂停或待重学的节点。</p>';
+  $('reviewGroups').innerHTML = html;
+}
+async function enableReviewFlow(){
+  if (!confirm('启用复习计划？默认间隔：7 / 21 / 45 / 90 天（本次完成到下一次复习；可在下方修改，只影响后续排期）。')) return;
+  try{
+    const out = await api('/api/review/update-settings', {enabled: true, confirm: true});
+    toast('复习已启用：' + out.settings.intervals.join('/') + ' 天');
+    refreshReview(); refreshReviewInner();
+  }catch(e){ handleErr(e); }
+}
+async function disableReviewFlow(){
+  if (!confirm('停用复习计划？（不再新增排期；历史到期日保留）')) return;
+  try{ await api('/api/review/update-settings', {enabled: false}); toast('复习已停用'); refreshReview(); }
+  catch(e){ handleErr(e); }
+}
+async function changeIntervals(){
+  const intervals = $('riInput').value.split(',').map(x=>parseInt(x.trim(),10)).filter(x=>!isNaN(x));
+  try{
+    const out = await api('/api/review/update-settings', {intervals});
+    toast('间隔已修改（只影响后续排期）：' + out.settings.intervals.join('/'));
+    refreshReview();
+  }catch(e){ handleErr(e); }
+}
+async function recalcPreviewFlow(){
+  try{
+    const intervals = $('riInput').value.split(',').map(x=>parseInt(x.trim(),10)).filter(x=>!isNaN(x));
+    const p = await api('/api/review/recalc-preview', {intervals});
+    if (!p.diff.length) return toast('按新间隔没有需要变化的到期日');
+    if (!confirm('将重算 ' + p.diff.length + ' 个节点的到期日，确认？')) return;
+    await api('/api/review/update-settings', {intervals, recalc: true, recalc_confirm: true});
+    toast('已按新间隔重算'); refreshReview();
+  }catch(e){ handleErr(e); }
+}
+async function snoozeReview(nodeId, hours = 8){
+  try{
+    const out = await api('/api/review/snooze', {node_id: nodeId, hours});
+    toast(`已推迟提醒到 ${String(out.snooze_until).slice(0,16).replace('T',' ')}（到期日不变）`);
+    refreshReview();
+  }catch(e){ handleErr(e); }
+}
+async function pauseReview(nodeId){
+  try{ await api('/api/review/pause', {node_id: nodeId}); toast('已暂停（到期日保留）'); refreshReview(); }
+  catch(e){ handleErr(e); }
+}
+async function resumeReview(nodeId){
+  try{ await api('/api/review/resume', {node_id: nodeId}); toast('已恢复'); refreshReview(); }
+  catch(e){ handleErr(e); }
+}
+function viewNodeFromReview(nodeId){ showTab('nodes'); setTimeout(()=>openNode(nodeId), 300); }
+function pollReviewLoop(){
+  try{ refreshReviewInner(); }catch(e){}
+  setTimeout(pollReviewLoop, 60000);
+}
+
+/* ============ 掌握测验 ============ */
+let quizSessionId = null, quizPollTimer = null;
+
+function quizStateLabel(s){
+  return {preparing:'正在准备…', awaiting_question:'正在出题…', awaiting_answer:'等待回答',
+    judging:'正在判定…', passed:'已通过', failed:'未通过', inconclusive:'暂时无法判定',
+    assisted_learning:'辅助学习（不计入判定）',
+    failed_request:'请求失败', cancelled:'已取消', expired:'会话已过期'}[s] || s;
+}
+async function startQuiz(nodeId, kind='mastery'){
+  try{
+    const s = await api('/api/quiz/start', {node_id: nodeId, kind, request_id: rid(), base_version: VERSION});
+    quizSessionId = s.session_id;
+    show('quizModal'); renderQuiz(s); pollQuiz();
+  }catch(e){ handleErr(e); }
+}
+function renderQuiz(s){
+  $('quizAdapter').textContent = s.adapter || '';
+  const body = $('quizBody');
+  if (['passed','failed','inconclusive','assisted_learning','failed_request','cancelled','expired'].includes(s.status)){
+    let head = '', detail = '';
+    if (s.status === 'passed'){
+      head = '<span class="quiz-state quiz-ok">已通过 · 节点进入掌握层</span>';
+      const met = ((s.feedback&&s.feedback.key_points_met)||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join('');
+      detail = `<p>${escapeHtml((s.feedback&&s.feedback.feedback)||'')}</p>${met?`<p class="muted">满足的关键要求：</p><ul>${met}</ul>`:''}
+        <p class="muted" id="nextArrangement">正在读取下一次安排…</p>`;
+    } else if (s.status === 'failed'){
+      head = '<span class="quiz-state quiz-bad">未通过 · 节点留在视野层</span>';
+      const gaps = ((s.feedback&&s.feedback.gaps)||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join('');
+      detail = `<p>${escapeHtml((s.feedback&&s.feedback.feedback)||'')}</p>${gaps?`<p class="muted">核心缺口：</p><ul>${gaps}</ul>`:''}
+        <button onclick="renewQuiz()">换一道独立的新题再测</button>`;
+    } else if (s.status === 'inconclusive'){
+      head = '<span class="quiz-state quiz-bad">暂时无法判定</span>';
+      detail = `<p>${escapeHtml(s.error || (s.feedback&&s.feedback.feedback) || '判定所需信息不足。这不是你能力不足的结论。')}</p>
+        <button onclick="renewQuiz()">换一道题</button>`;
+    } else if (s.status === 'assisted_learning'){
+      head = '<span class="quiz-state quiz-bad">辅助学习 · 不计入独立掌握判定</span>';
+      const mv = s.feedback&&s.feedback.model_verdict ? `模型参考意见：${escapeHtml(s.feedback.model_verdict)}` : '';
+      detail = `<p>${escapeHtml((s.feedback&&s.feedback.feedback)||'')}</p>
+        <p class="muted">${mv}。可以继续学习；稍后换一道独立新题再测。</p>
+        <button onclick="renewQuiz()">换一道独立的新题</button>`;
+    } else if (s.status === 'failed_request'){
+      head = '<span class="quiz-state quiz-err">请求失败（未影响节点状态）</span>';
+      detail = `<p class="muted">${escapeHtml(s.error||'模型调用失败；失败与重试次数受预算限制。')}</p>
+        <button onclick="renewQuiz()">重试出题</button>`;
+    } else {
+      head = `<span class="quiz-state quiz-err">${quizStateLabel(s.status)}</span>`;
+      detail = '<p class="muted">会话已结束。节点状态未改变。</p>';
+    }
+    body.innerHTML = `<p><b>${escapeHtml(s.node_name)}</b> · ${escapeHtml(s.node_scope)}</p>
+      <p>${head}</p>${detail}
+      <div class="row" style="margin-top:10px"><button onclick="closeQuiz()">关闭</button></div>`;
+    if (s.status === 'passed'){
+      api('/api/node/'+s.node_id).then(d=>{
+        const nr = d.node.next_review_at;
+        const el = document.getElementById('nextArrangement');
+        if (el) el.textContent = nr ? ('下一次复习安排：' + nr + '（可在待复习页查看）') : '尚未安排复习（复习未启用或该结果不排期）';
+      });
+    }
+    return;
+  }
+  if (s.status === 'awaiting_answer'){
+    const crit = ((s.criteria&&s.criteria.key_points)||[]).map(k=>`<li>${escapeHtml(k)}</li>`).join('');
+    const hints = (s.hints||[]).map(h=>`<p class="confirmtip warn-text">提示（本题使用提示后不能作为独立通过依据）：${escapeHtml(h)}</p>`).join('');
+    body.innerHTML = `
+      <p><b>${escapeHtml(s.node_name)}</b> · ${escapeHtml(s.node_scope)}</p>
+      <p class="muted">通过条件（判定标准，已在回答前冻结）：${crit?`<ul>${crit}</ul>`:escapeHtml(s.criteria_source||'')}</p>
+      <div class="quiz-notice">数据发送（${escapeHtml(s.adapter||'')}）：${escapeHtml((s.data_scope?.always_sent||[]).join('、'))}${s.include_note_content?'，以及关联笔记正文摘录（你已确认）':''}。问答仅存于服务内存，会话结束即清理；第三方服务自身留存政策不受本地控制。</div>
+      ${s.include_note_content?'':`<p class="muted"><label><input type="checkbox" onchange="confirmQuizNotes('${s.session_id}', this)"> 判定材料附带关联笔记正文摘录（默认不发送）</label></p>`}
+      ${hints}
+      <div class="quiz-q">${escapeHtml(s.question||'')}</div>
+      <textarea id="quizAnswer" placeholder="用自己的话回答即可；同义表述可接受，不要求复述原文。" style="min-height:120px;margin-top:8px"></textarea>
+      <div class="row">
+        <button class="primary" onclick="submitQuiz()">提交回答</button>
+        <button onclick="hintQuiz()" ${s.hint_used?'disabled':''}>请求提示</button>
+        <button onclick="renewQuiz()">换一道题</button>
+        <span class="muted">本会话模型调用 ${s.calls_used}/${s.calls_max}</span>
+      </div>`;
+    return;
+  }
+  if (s.status === 'judging'){
+    body.innerHTML = `<p><b>${escapeHtml(s.node_name)}</b></p><p class="quiz-state">正在判定…（模型调用在服务端后台执行，可安全等待或取消）</p>
+      <div class="row"><button onclick="cancelQuiz(false)">取消</button></div>`;
+    return;
+  }
+  body.innerHTML = `<p class="quiz-state">${quizStateLabel(s.status)}</p><p class="muted">正在${s.status==='preparing'?'准备通过条件':'生成问题'}…</p>`;
+}
+function pollQuiz(){
+  clearTimeout(quizPollTimer);
+  if (!quizSessionId || $('quizModal').classList.contains('hidden')) return;
+  api('/api/quiz/session/'+quizSessionId).then(s=>{
+    renderQuiz(s);
+    if (['passed','failed','inconclusive','assisted_learning'].includes(s.status)){
+      refreshVersion(); refreshGraph();
+      if (!$('tab-review').classList.contains('hidden')) refreshReviewInner();  // 待复习页即时联动
+      if (currentNode && currentNode.node.id===s.node_id) openNode(s.node_id);
+      return;
+    }
+    if (['preparing','awaiting_question','judging'].includes(s.status)) quizPollTimer = setTimeout(pollQuiz, 1500);
+  }).catch(()=>{ quizPollTimer = setTimeout(pollQuiz, 2500); });
+}
+async function submitQuiz(){
+  const answer = $('quizAnswer') ? $('quizAnswer').value : '';
+  try{
+    const s = await api('/api/quiz/answer', {session_id: quizSessionId, answer});
+    renderQuiz(s); pollQuiz();
+  }catch(e){ handleErr(e); }
+}
+async function hintQuiz(){
+  try{ const s = await api('/api/quiz/hint', {session_id: quizSessionId}); renderQuiz(s); pollQuiz(); }
+  catch(e){ handleErr(e); }
+}
+async function renewQuiz(){
+  try{ const s = await api('/api/quiz/renew', {session_id: quizSessionId}); renderQuiz(s); pollQuiz(); }
+  catch(e){ handleErr(e); }
+}
+async function confirmQuizNotes(sid, cb){
+  if (!cb.checked) return;
+  try{ await api('/api/quiz/confirm-notes', {session_id: sid}); toast('已确认：判定材料将附带关联笔记正文摘录'); renderQuiz(await api('/api/quiz/session/'+sid)); }
+  catch(e){ cb.checked = false; handleErr(e); }
+}
+async function cancelQuiz(fromClose){
+  if (!quizSessionId) { hide('quizModal'); return; }
+  try{ await api('/api/quiz/cancel', {session_id: quizSessionId}); }catch(e){}
+  clearTimeout(quizPollTimer);
+  hide('quizModal');
+  if (!fromClose) toast('测验已取消（节点状态未改变）');
+  quizSessionId = null;
+  if (!$('tab-review').classList.contains('hidden')) refreshReviewInner();
+}
+function closeQuiz(){
+  clearTimeout(quizPollTimer); hide('quizModal'); quizSessionId = null;
+  if (!$('tab-review').classList.contains('hidden')) refreshReviewInner();
+}
+
+/* ============ 通用 ============ */
+let searchTimer = null;
+$('gq').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => refreshGraph(), 250); });
+for (const id of ['gDomain', 'gLayer', 'gStatus']) $(id).addEventListener('change', () => refreshGraph());
+function handleErr(e){
+  if (e.data && e.data.status===409){ toast('版本冲突：' + e.message + '（界面已刷新版本，请重试）', true); refreshVersion(); }
+  else if (e.data && e.data.status===403){ toast('路径被拒绝：' + e.message, true); }
+  else toast((e.data&&e.data.error)||e.message, true);
+}
+async function shutdownApp(){
+  if (!confirm('停止本地管理服务？（不影响测试知识库数据）')) return;
+  try{ await api('/api/shutdown', {}); }catch(e){}
+  document.body.innerHTML = '<main><div class="panel"><h3>服务已停止</h3><p class="muted">如需再次使用，重新运行启动命令即可。</p></div></main>';
+}
+function stripEntryTicket(){
+  // 一次性票据经 URL fragment 传入：交换后立即从地址栏移除，不进访问日志
+  const params = new URLSearchParams(String(location.hash||'').replace(/^#/,''));
+  const ticket = params.get('ticket');
+  if (!ticket) return null;
+  const clean = location.pathname + location.search;
+  try { history.replaceState(null, '', clean); } catch(e) {}
+  return ticket;
+}
+async function exchangeEntryTicket(){
+  const ticket = stripEntryTicket();
+  if (!ticket) return null;
+  try { await api('/api/session/exchange', {ticket}); return 'ok'; }
+  catch(e){ return (e.data && e.data.error && e.data.error.code) || 'exchange_failed'; }
+}
+(async function init(){
+  try{
+    const exchange = await exchangeEntryTicket();
+    const meta = await api('/api/meta');
+    TOKEN = meta.token || '';
+    const taskMode = meta.pipeline_mode === 'task';
+    if (meta.banner) $('banner').textContent = meta.banner
+      + (taskMode ? ' · 任务流水线（task）：自动审核后入库，失败与缺配置如实显示' : '');
+    if (taskMode && !meta.token && exchange !== 'ok') {
+      // 不退回读 meta 明文令牌：task 模式下写操作必须从主程序入口链接认证
+      toast('本页未认证：写操作需从主程序入口链接（含 #ticket=）打开；只读查看不受影响', true);
+    } else if (exchange && exchange !== 'ok') {
+      toast('入口票据未能交换（' + exchange + '）：请重新从主程序打开入口链接', true);
+    }
+    $('vaultMeta').textContent = (meta.real_vault_mode ? '真实库（受控）' : '测试库') + '：' + meta.test_vault
+      + (meta.real_vault_mode ? '' : ' · 真实库（只读）：' + meta.real_vault_readonly)
+      + (meta.quiz_adapter ? ' · ' + meta.quiz_adapter : '');
+  }catch(e){ showOverlay(`<div><h3 class="err-text">服务连接失败</h3><p class="muted">管理服务未启动或已停止。请重新运行启动命令后刷新页面。这不是"知识库为空"。</p></div>`); return; }
+  await refreshVersion();
+  const hasSaved = !!sessionStorage.getItem('pka_view');
+  loadViewState();
+  await refreshGraph();
+  pollReviewLoop();
+  if (!hasSaved) fitView();  // 首次加载自动适应视图，避免带外节点被裁剪
+  else applyView();          // 恢复上次视角
+  if (selectedId) openGraphNode(selectedId);
+})();
+</script>
+</body>
+</html>

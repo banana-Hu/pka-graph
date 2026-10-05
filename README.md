@@ -1,10 +1,13 @@
-# 知能图谱（PKA Graph）· 个人知识建模系统
+# Know You · 个人知识建模系统
+
+> **越来越懂你**：AI 帮你收集与加工知识，测验为你确认掌握，
+> 复习让记忆长存——你越用，它越了解你懂什么、不懂什么。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **第一次使用？** 读 [docs/从零开始-建立你自己的知识库.md](docs/从零开始-建立你自己的知识库.md)
 ——10 分钟：获取程序 → 启动 → 建立自己的知识库 → 投递材料 → 测验 → 接 Notion。
-Windows exe 在 [Releases](https://github.com/banana-Hu/pka-graph/releases/tag/v1.0.0)。
+Windows exe 在 [Releases](https://github.com/banana-Hu/know-you/releases/tag/v1.0.0)。
 
 **多实例**：每个实例 = 一个知识库 + 一个端口。在程序目录建
 `instance.local.json`（gitignored）声明你的日常库：

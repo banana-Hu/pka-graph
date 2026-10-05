@@ -59,13 +59,6 @@ def main() -> int:
          *[x for e in excludes for x in ("--exclude-module", e)],
          str(ROOT / "知识库入口.py")])
 
-    # 3) 服务端 exe 放到目录根部（onedir 的 _internal 同级），双击即用
-    src_exe = out_dir / "知能图谱服务" / "知能图谱服务" / "知能图谱服务.exe"
-    if not src_exe.exists():
-        raise SystemExit("服务端 exe 未生成")
-    (out_dir / "知能图谱服务" / "知能图谱服务.exe").replace(
-        out_dir / "知能图谱服务" / "知能图谱服务.exe")
-
     # 4) 使用说明
     (out_dir / "启动说明.md").write_text(
         Path(ROOT / "packaging" / "启动说明.md").read_text(encoding="utf-8"),

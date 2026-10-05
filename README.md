@@ -1,5 +1,7 @@
 # 知能图谱（PKA Graph）· 个人知识建模系统
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 **第一次使用？** 读 [docs/从零开始-建立你自己的知识库.md](docs/从零开始-建立你自己的知识库.md)
 ——10 分钟：获取程序 → 启动 → 建立自己的知识库 → 投递材料 → 测验 → 接 Notion。
 Windows exe 在 [Releases](https://github.com/banana-Hu/pka-graph/releases/tag/v1.0.0)。
